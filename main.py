@@ -1,8 +1,7 @@
 from random import randrange
 from ursina import *
 from ursina.prefabs.first_person_controller import FirstPersonController
-from numpy import floor
-from numpy import abs
+from numpy import floor, abs, sin, cos, radians
 import time
 from perlin_noise import PerlinNoise
 from nMap import nMap
@@ -25,26 +24,38 @@ monoTex = load_texture('stroke_mono.png')
 wireTex = load_texture('wireframe.png')
 stoneTex = load_texture('grass_mono.png')
 
+cubeTex = load_texture('moonCube.png')
+cubeModel = load_model('moonCube.obj')
+
+axoTex = load_texture('axolotl.png')
+axoModel = load_model('axolotl.obj')
+
 bte = Entity(model='cube', texture=wireTex)
+
+
 class BTYPE:
-    STONE = color.rgb(255,255,255)
-    GRASS = color.rgb(0,255,0)
-    SOIL = color.rgb(255,80,100)
-    RUBY = color.rgb(255,0,0)
+    STONE = color.rgb(255, 255, 255)
+    GRASS = color.rgb(0, 255, 0)
+    SOIL = color.rgb(255, 80, 100)
+    RUBY = color.rgb(255, 0, 0)
+
 
 blockType = BTYPE.SOIL
 buildMode = -1  # -1 is OFF, 1 is ON
 
+
 def buildTool():
-    # if buildMode == -1:
-    #     bte.visible = False
-    # else: bte.visible = True
+    if buildMode == -1:
+        bte.visible = False
+    else:
+        bte.visible = True
     bte.position = round(subject.position + camera.forward * 3)
     bte.y += 2
     bte.x = round(bte.x)
     bte.y = round(bte.y)
     bte.z = round(bte.z)
     bte.color = blockType
+
 
 def build():
     e = duplicate(bte)
@@ -53,17 +64,17 @@ def build():
     e.color = blockType
     e.shake(duration=.5, speed=.01)
 
+
 def input(key):
-    global blockType, buildMode
+    global blockType, buildMode, generating, canGenerate
     if key == 'q' or key == 'escape':
         quit()
     if key == 'g':
-        generateSubset()
+        generating *= -1
+        canGenerate *= -1
     if buildMode == 1 and key == 'left mouse up':
-        # e = mouse.hovered_entity
-        # if not e:
         build()
-    elif key == 'right mouse up':
+    elif buildMode == 1 and key == 'right mouse up':
         e = mouse.hovered_entity
         destroy(e)
 
@@ -74,20 +85,23 @@ def input(key):
     if key == '3': blockType = BTYPE.STONE
     if key == '4': blockType = BTYPE.RUBY
 
+
 def update():
-    global prevTime, prevZ, prevX, amp
+    global prevTime, prevZ, prevX, genSpeed, perCycle, origin, rad, generating, canGenerate, theta
     if abs(subject.z - prevZ) > 1 or abs(subject.x - prevX) > 1:
-        generateShell()
+        origin = subject.position
+        rad = 0
+        theta = 0
+        generating = 1 * canGenerate
+        prevZ = subject.z
+        prevX = subject.x
 
-    if time.time() - prevTime > 0.005:
-        generateSubset()
+    generateShell()
+
+    if time.time() - prevTime > genSpeed:
+        for i in range(perCycle):
+            genTerrain()
         prevTime = time.time()
-
-    # Safety net in case of glitching(bugging) through terrain
-    if subject.y < -amp-1:
-        subject.y = subject.height + floor((noise([subject.x / freq,
-                                                   subject.z / freq])) * amp)
-        subject.land()
 
     vincent.look_at(subject, 'forward')
     vincent.rotation_z = 0
@@ -95,106 +109,135 @@ def update():
     buildTool()
 
 
-
-noise = PerlinNoise(octaves=2, seed=99)
-amp = 24    # Maximum Height
-freq = 100   # Frecuency of height
-terrain = Entity(model=None, collider=None)
-terrainWidth = 40
-terrainFinished = False
-subWidth = int(terrainWidth / 10)
+noise = PerlinNoise(octaves=1, seed=99)
+megasets = []
 subsets = []
 subCubes = []
-sci = 0
+
+# New variables
+generating = 1  # -1 if off
+canGenerate = 1  # -1 is off
+genSpeed = 0
+perCycle = 16
+currentCube = 0
 currentSubset = 0
+numSubCubes = 16
+numSubsets = 42     # I.e. how many combined into a megaset?
+theta = 0
+rad = 0
+
+# Dictionary for recording whether terrain blocks exist al location specified in key
+subDic = {}
 
 # Instantiate our 'ghost' subset cubes
-for i in range(subWidth):
+for i in range(numSubCubes):
     bud = Entity(model='cube')
+    bud.disable()
     subCubes.append(bud)
 
 # Instantiate our empty subset
-for i in range(int((terrainWidth * terrainWidth) / subWidth)):
+for i in range(numSubsets):
     bud = Entity(model=None)
-    bud.parent = terrain
+    bud.texture = cubeTex
+    bud.disable()
     subsets.append(bud)
 
 
-def generateSubset():
-    global sci, currentSubset, freq, amp, terrainWidth
-    if currentSubset >= len(subsets):
-        finishTerrain()
-        return
-    for i in range(subWidth):
-        x = subCubes[i].x = floor((i + sci)/terrainWidth)
-        z = subCubes[i].z = floor((i + sci) % terrainWidth)
-        y = subCubes[i].y = floor((noise([x/freq, z/freq]))*amp)
-        subCubes[i].parent = subsets[currentSubset]
-
-        # Set colour of subCube
-        y += randrange(-4, 4)
-        r = 0
-        g = 0
-        b = 0
-        if y > amp*0.3:
-            b = 255
-        if y == 4:
-            r = g = b = 255
-        else:
-            g = nMap(y, 0, amp * 0.5, 0, 255)
-        # Red zone?
-        if z > terrainWidth*.5:
-            g = 0
-            b = 0
-            r = nMap(y, 0, amp, 110, 255)
-        subCubes[i].color = color.rgb(r, g, b)
-        subCubes[i].visible = False
-
-    subsets[currentSubset].combine(auto_destroy=False)
-    # subsets[currentSubset].texture = grassStrokerTex
-    sci += subWidth
-    currentSubset += 1
+def genPerlin(_x, _z):
+    y = 0
+    freq = 64
+    amp = 42
+    y += ((noise([_x / freq, _z / freq])) * amp)
+    freq = 32
+    amp = 21
+    y += ((noise([_x / freq, _z / freq])) * amp)
+    return floor(y)
 
 
-def finishTerrain():
-    global terrainFinished
-    if terrainFinished: return
-    terrain.texture = grassStrokerTex
-    # application.pause()
-    terrain.combine()
-    terrainFinished = True
-    # terrain.texture = grassStrokerTex
-    # application.resume()
+def genTerrain():
+    global currentCube, theta, rad, currentSubset, generating, numSubCubes
+
+    if generating == -1: return
+    # Decide where to place new terrain cube
+    x = floor(origin.x + sin(radians(theta)) * rad)
+    z = floor(origin.z + cos(radians(theta)) * rad)
+    # Check whether there is terrain here already...
+    if subDic.get('x' + str(x) + 'z' + str(z)) != 'i':
+        subCubes[currentCube].enable()
+        subCubes[currentCube].x = x
+        subCubes[currentCube].z = z
+        subDic['x' + str(x) + 'z' + str(z)] = 'i'
+        subCubes[currentCube].parent = subsets[currentSubset]
+        y = subCubes[currentCube].y = genPerlin(x, z)
+        g = nMap(y, -8, 21, 12, 243)
+        g += random.randint(-12, 12)
+        subCubes[currentCube].color = color.rgb(0, g, 0)
+        subCubes[currentCube].disable()
+        currentCube += 1
+
+        # Ready to build a subset?
+        if currentCube == numSubCubes:
+            subsets[currentSubset].combine(auto_destroy=False)
+            subsets[currentSubset].enable()
+            currentSubset += 1
+            currentCube = 0
+
+            # And ready to buyild a megaset?
+            if currentSubset == numSubsets:
+                megasets.append(Entity(texture=cubeTex))
+                # Parent all subsets to our new megaset
+                for s in subsets:
+                    s.parent = megasets[-1]
+                megasets[-1].combine(auto_destroy=False)
+                currentSubset = 0
+                print('Megaset #' + str(len(megasets))+'!')
+
+    else:
+        pass
+    # There was terrain already there, so continue rotation to find new terrain spot.
+    if rad > 0:
+        theta += 45 / rad
+    else:
+        rad += 0.5
+
+    if theta >= 360:
+        theta = 0
+        rad += 0.5
 
 
 shellies = []
 shellWidth = 3
 for i in range(shellWidth * shellWidth):
-    bud = Entity(model='cube', collider='box')
+    bud = Entity(model=cubeModel, collider='box')
     bud.visible = False
     shellies.append(bud)
 
 
 def generateShell():
-    global shellWidth, amp, freq
+    global shellWidth
     for i in range(len(shellies)):
         x = shellies[i].x = floor((i / shellWidth) + subject.x - 0.5 * shellWidth)
         z = shellies[i].z = floor((i % shellWidth) + subject.z - 0.5 * shellWidth)
-        shellies[i].y = floor((noise([x / freq, z / freq])) * amp)
+        shellies[i].y = genPerlin(x, z)
 
 
 subject = FirstPersonController()
 subject.cursor.visible = False
 subject.gravity = 0.5
 subject.x = subject.z = 5
-subject.y = 12
+subject.y = 32
 prevZ = subject.z
 prevX = subject.x
+origin = subject.position  # Vec3 object? .x .y .z
 
 chickenModel = load_model('chicken.obj')
 vincent = Entity(model=chickenModel, scale=1,
                  x=22, z=16, y=4,
                  texture='chicken.png',
+                 double_sided=True)
+baby = Entity(model=axoModel, scale=10,
+                 x=-22, z=16, y=4,
+                 texture=axoTex,
                  double_sided=True)
 
 generateShell()
