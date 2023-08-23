@@ -5,12 +5,12 @@ from numpy import floor, abs, sin, cos, radians
 import time
 from perlin_noise import PerlinNoise
 from nMap import nMap
+# from safe_combine import safe_combine
 
 app = Ursina()
 
 window.color = color.rgb(0, 200, 211)
 window.exit_button.visible = False
-# window.fps_counter.enabled = True
 # window.fullscreen = True
 # window.show_ursina_splash = True
 
@@ -19,18 +19,24 @@ prevTime = time.time()
 scene.fog_color = color.rgb(0, 222, 0)
 scene.fog_density = .02
 
-grassStrokerTex = load_texture('grass_14.png')
-monoTex = load_texture('stroke_mono.png')
-wireTex = load_texture('wireframe.png')
-stoneTex = load_texture('grass_mono.png')
+strokeGrassTex = 'stroke_grass_14.png'
+monoTex = 'stroke_mono.png'
+wireTex = 'wireframe.png'
+stoneTex = 'grass_mono.png'
+cubeTex = 'moonCube.png'
+cubeMod = 'moonCube'
+blockTex = 'block_texture.png'
+imgTex = 'img.png'
+grassTex = 'grass_block_side.png'
+axoTex = 'axolotl.png'
+axoModel = 'axolotl'
+pickaxeTex = 'diamond_pickaxe.png'
+axeTex = 'diamond_axe_tex.png'
+pickaxeMod = 'Diamond-Pickaxe'
 
-cubeTex = load_texture('moonCube.png')
-cubeModel = load_model('moonCube.obj')
+ii = 1
 
-axoTex = load_texture('axolotl.png')
-axoModel = load_model('axolotl.obj')
-
-bte = Entity(model='cube', texture=wireTex)
+# Built material
 
 
 class BTYPE:
@@ -40,8 +46,10 @@ class BTYPE:
     RUBY = color.rgb(255, 0, 0)
 
 
-blockType = BTYPE.SOIL
+blockType = BTYPE.STONE
 buildMode = -1  # -1 is OFF, 1 is ON
+
+bte = Entity(model='cube', texture=grassTex)
 
 
 def buildTool():
@@ -49,24 +57,34 @@ def buildTool():
         bte.visible = False
     else:
         bte.visible = True
-    bte.position = round(subject.position + camera.forward * 3)
+    bte.position = round(subject.position + camera.forward * 2)
     bte.y += 2
     bte.x = round(bte.x)
     bte.y = round(bte.y)
     bte.z = round(bte.z)
     bte.color = blockType
 
-
+# Build new cube
 def build():
     e = duplicate(bte)
     e.collider = 'cube'
-    e.texture = stoneTex
     e.color = blockType
     e.shake(duration=.5, speed=.01)
 
 
+# Keep the cursor inside the game
+class Voxel(Button):
+    def input(self, key):
+        if self.hovered:
+            if key == "right mouse down":
+                voxel = Voxel(position= self.position * mouse.normal)
+            if key == "left mouse down":
+                destroy(self)
+
+
+
 def input(key):
-    global blockType, buildMode, generating, canGenerate
+    global blockType, buildMode, generating, canGenerate, ii
     if key == 'q' or key == 'escape':
         quit()
     if key == 'g':
@@ -80,14 +98,34 @@ def input(key):
 
     if key == 'f': buildMode *= -1
 
-    if key == '1': blockType = BTYPE.SOIL
-    if key == '2': blockType = BTYPE.GRASS
-    if key == '3': blockType = BTYPE.STONE
-    if key == '4': blockType = BTYPE.RUBY
+    if key == '1':
+        blockType = BTYPE.SOIL
+        ii = 1
+    if key == '2':
+        blockType = BTYPE.GRASS
+        ii = 2
+    if key == '3':
+        blockType = BTYPE.STONE
+        ii = 3
+    if key == '4':
+        blockType = BTYPE.RUBY
+        ii = 4
+
+    # Binding key for linkers
+    input_handler.rebind('page down', 'd')
+    input_handler.rebind('delete', 'a')
+    input_handler.rebind('home', 'w')
+    input_handler.rebind('right control', 'space')
+    input_handler.rebind('end', 's')
+    input_handler.rebind('enter', 'f')
+    input_handler.rebind('insert', str(ii+1),)
+
 
 
 def update():
-    global prevTime, prevZ, prevX, genSpeed, perCycle, origin, rad, generating, canGenerate, theta
+    global prevTime, prevZ, prevX, genSpeed, perCycle, origin, rad, generating, canGenerate, theta, ii
+    if ii == 4:
+        ii = 0
     if abs(subject.z - prevZ) > 1 or abs(subject.x - prevX) > 1:
         origin = subject.position
         rad = 0
@@ -118,11 +156,11 @@ subCubes = []
 generating = 1  # -1 if off
 canGenerate = 1  # -1 is off
 genSpeed = 0
-perCycle = 16
+perCycle = 160
 currentCube = 0
 currentSubset = 0
-numSubCubes = 16
-numSubsets = 42     # I.e. how many combined into a megaset?
+numSubCubes = 160
+numSubsets = 420     # I.e. how many combined into a megaset?
 theta = 0
 rad = 0
 
@@ -131,14 +169,13 @@ subDic = {}
 
 # Instantiate our 'ghost' subset cubes
 for i in range(numSubCubes):
-    bud = Entity(model='cube')
+    bud = Entity(model='cube', texture=grassTex)
     bud.disable()
     subCubes.append(bud)
 
 # Instantiate our empty subset
 for i in range(numSubsets):
-    bud = Entity(model=None)
-    bud.texture = cubeTex
+    bud = Entity(model='cube', texture=grassTex)
     bud.disable()
     subsets.append(bud)
 
@@ -155,7 +192,7 @@ def genPerlin(_x, _z):
 
 
 def genTerrain():
-    global currentCube, theta, rad, currentSubset, generating, numSubCubes
+    global currentCube, theta, rad, currentSubset, generating, numSubCubes, cubeMod, blockTex
 
     if generating == -1: return
     # Decide where to place new terrain cube
@@ -169,9 +206,9 @@ def genTerrain():
         subDic['x' + str(x) + 'z' + str(z)] = 'i'
         subCubes[currentCube].parent = subsets[currentSubset]
         y = subCubes[currentCube].y = genPerlin(x, z)
-        g = nMap(y, -8, 21, 12, 243)
-        g += random.randint(-12, 12)
-        subCubes[currentCube].color = color.rgb(0, g, 0)
+        g = nMap(y, -8, 21, 132, 212)
+        g += random.randint(-32, 32)
+        subCubes[currentCube].color = color.rgb(g, g, g)
         subCubes[currentCube].disable()
         currentCube += 1
 
@@ -184,7 +221,7 @@ def genTerrain():
 
             # And ready to buyild a megaset?
             if currentSubset == numSubsets:
-                megasets.append(Entity(texture=cubeTex))
+                megasets.append(Entity(model='cube', texture=grassTex))
                 # Parent all subsets to our new megaset
                 for s in subsets:
                     s.parent = megasets[-1]
@@ -208,12 +245,15 @@ def genTerrain():
 shellies = []
 shellWidth = 3
 for i in range(shellWidth * shellWidth):
-    bud = Entity(model=cubeModel, collider='box')
+    bud = Entity(model='cube', collider='cube')
     bud.visible = False
     shellies.append(bud)
 
 
 def generateShell():
+    # global subject
+    # target_y = genPerlin(subject.x, subject.z) + 4
+    # subject.y = lerp(subject.y, target_y, .1)
     global shellWidth
     for i in range(len(shellies)):
         x = shellies[i].x = floor((i / shellWidth) + subject.x - 0.5 * shellWidth)
