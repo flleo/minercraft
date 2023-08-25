@@ -1,11 +1,12 @@
 from random import randrange
+
+from direct.showbase.ShowBaseGlobal import globalClock
 from ursina import *
 from ursina.prefabs.first_person_controller import FirstPersonController
 from numpy import floor, abs, sin, cos, radians
 import time
 from perlin_noise import PerlinNoise
 from nMap import nMap
-# from safe_combine import safe_combine
 
 app = Ursina()
 
@@ -19,6 +20,7 @@ prevTime = time.time()
 scene.fog_color = color.rgb(0, 222, 0)
 scene.fog_density = .02
 
+# Built material
 strokeGrassTex = 'stroke_grass_14.png'
 monoTex = 'stroke_mono.png'
 wireTex = 'wireframe.png'
@@ -32,11 +34,10 @@ axoTex = 'axolotl.png'
 axoModel = 'axolotl'
 pickaxeTex = 'diamond_pickaxe.png'
 axeTex = 'diamond_axe_tex.png'
-pickaxeMod = 'Diamond-Pickaxe'
-
+axeMod = 'Diamond-Pickaxe'
+strippedTex = 'stripped_birch_log.png'
+# To rotate type of material(color) to build
 ii = 1
-
-# Built material
 
 
 class BTYPE:
@@ -49,6 +50,7 @@ class BTYPE:
 blockType = BTYPE.STONE
 buildMode = -1  # -1 is OFF, 1 is ON
 
+# Our mining tool
 bte = Entity(model='cube', texture=grassTex)
 
 
@@ -58,7 +60,7 @@ def buildTool():
     else:
         bte.visible = True
     bte.position = round(subject.position + camera.forward * 2)
-    bte.y += 2
+    bte.y += 1
     bte.x = round(bte.x)
     bte.y = round(bte.y)
     bte.z = round(bte.z)
@@ -68,22 +70,30 @@ def buildTool():
 def build():
     e = duplicate(bte)
     e.collider = 'cube'
+    e.texture = grassTex
+    e.model = 'cube'
     e.color = blockType
     e.shake(duration=.5, speed=.01)
 
 
-# Keep the cursor inside the game
-class Voxel(Button):
-    def input(self, key):
-        if self.hovered:
-            if key == "right mouse down":
-                voxel = Voxel(position= self.position * mouse.normal)
-            if key == "left mouse down":
-                destroy(self)
 
+
+class Voxel(Button):
+    def __init__(self, position=(0, 0, 0)):
+        super().__init__()
+
+    def input(self, key):
+
+        if self.hovered:
+            if key == "left mouse down":
+                voxel = Voxel(position=self.position * mouse.normal)
+            if key == "right mouse down":
+                print('bye')
 
 
 def input(key):
+    if key == 'v':
+        voxel = Voxel(position=(0, -100, 0), )
     global blockType, buildMode, generating, canGenerate, ii
     if key == 'q' or key == 'escape':
         quit()
@@ -123,6 +133,7 @@ def input(key):
 
 
 def update():
+
     global prevTime, prevZ, prevX, genSpeed, perCycle, origin, rad, generating, canGenerate, theta, ii
     if ii == 4:
         ii = 0
@@ -160,13 +171,17 @@ perCycle = 160
 currentCube = 0
 currentSubset = 0
 numSubCubes = 160
-numSubsets = 420     # I.e. how many combined into a megaset?
+numSubsets = 210     # I.e. how many combined into a megaset?
 theta = 0
 rad = 0
-
 # Dictionary for recording whether terrain blocks exist al location specified in key
 subDic = {}
-
+caveDic = {
+    'x9z9': 'cave',
+    'x10z9': 'cave',
+    'x11z9': 'cave',
+    'x9z10': 'cave',
+    'x9z11': 'cave'}
 # Instantiate our 'ghost' subset cubes
 for i in range(numSubCubes):
     bud = Entity(model='cube', texture=grassTex)
@@ -188,6 +203,10 @@ def genPerlin(_x, _z):
     freq = 32
     amp = 21
     y += ((noise([_x / freq, _z / freq])) * amp)
+    # is there are cave-gap here?
+
+    if caveDic.get('x' + str(int(_x)) + 'z' + str(int(_z))) == 'cave':
+        y += -8
     return floor(y)
 
 
@@ -226,8 +245,10 @@ def genTerrain():
                 for s in subsets:
                     s.parent = megasets[-1]
                 megasets[-1].combine(auto_destroy=False)
+                for s in subsets:
+                    s.parent = scene
                 currentSubset = 0
-                print('Megaset #' + str(len(megasets))+'!')
+                # print('Megaset #' + str(len(megasets))+'!')
 
     else:
         pass
@@ -249,26 +270,51 @@ for i in range(shellWidth * shellWidth):
     bud.visible = False
     shellies.append(bud)
 
-
+# Our new gravity system for moving the subject
 def generateShell():
-    # global subject
-    # target_y = genPerlin(subject.x, subject.z) + 4
-    # subject.y = lerp(subject.y, target_y, .1)
-    global shellWidth
-    for i in range(len(shellies)):
-        x = shellies[i].x = floor((i / shellWidth) + subject.x - 0.5 * shellWidth)
-        z = shellies[i].z = floor((i % shellWidth) + subject.z - 0.5 * shellWidth)
-        shellies[i].y = genPerlin(x, z)
+    global subject, grav_speed, grav_aceleration
+    delta_time = globalClock.getDt()
+    # What y is the terrain at this position?
+    target_y = genPerlin(subject.x, subject.z) + 2
+    # subject.y = lerp(subject.y, target_y, 9.807 * delta_time)
+    step_height = 0
+    # How far are we from the target y?
+    target_dist = target_y - subject.y
+    if 0 < target_dist < 5:
+        # To return to the original point to don't let us fall
+        subject.y = lerp(subject.y, target_y, 0.9807*delta_time)
+    # We are falling
+    elif target_dist < -step_height:
+        grav_speed += grav_aceleration * delta_time
+        subject.y -= grav_speed
+    # print('subject_y: ' + str(subject.y) + ';       target_y: ' + str(target_y))
 
 
+    # global shellWidth
+    # for i in range(len(shellies)):
+    #     x = shellies[i].x = floor((i / shellWidth) + subject.x - 0.5 * shellWidth)
+    #     z = shellies[i].z = floor((i % shellWidth) + subject.z - 0.5 * shellWidth)
+    #     shellies[i].y = genPerlin(x, z)
+
+# Subject First Person
 subject = FirstPersonController()
 subject.cursor.visible = False
-subject.gravity = 0.5
+subject.gravity = 0
+grav_speed = 0
+grav_aceleration = 0.1
 subject.x = subject.z = 5
-subject.y = 32
+subject.y = 24
 prevZ = subject.z
 prevX = subject.x
 origin = subject.position  # Vec3 object? .x .y .z
+# Our axe
+axe = Entity(model=axeMod, scale=0.1, texture=axeTex, position=subject.position, always_on_top=True)
+axe.x -= 3
+axe.z -= 2.2
+axe.y -= 24
+axe.rotation_z = 90
+axe.rotation_y = 180
+axe.parent = camera
 
 chickenModel = load_model('chicken.obj')
 vincent = Entity(model=chickenModel, scale=1,
