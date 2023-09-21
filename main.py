@@ -108,23 +108,7 @@ def mine():
         # print('Hola, estoy minando!')
         # subsets[s].model.generate()
 
-
-class Voxel(Button):
-    def __init__(self, position=(0, 0, 0)):
-        super().__init__()
-
-    def input(self, key):
-
-        if self.hovered:
-            if key == "left mouse down":
-                voxel = Voxel(position=self.position * mouse.normal)
-            if key == "right mouse down":
-                print('bye')
-
-
 def input(key):
-    if key == 'v':
-        voxel = Voxel(position=(0, -100, 0), )
     global blockType, buildMode, generating, canGenerate, ii, build_distance
     if key == 'q' or key == 'escape':
         quit()
@@ -144,7 +128,6 @@ def input(key):
         # build_distance -= 1
     if key == 'f':
         buildMode *= -1
-
     if key == '1':
         blockType = BTYPE.SOIL
         ii = 1
