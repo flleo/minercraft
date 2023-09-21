@@ -58,7 +58,8 @@ axeTex = 'diamond_axe_tex'
 bte = Entity(model='cube', texture=wireTex, scale=1.01)
 # distance of build (Thanks, Ethan!)
 build_distance = 3
-
+# To rotate type of material(color) to build
+ii = 1
 
 class BTYPE:
     STONE = color.rgb(255, 255, 255)
@@ -127,7 +128,7 @@ def mine():
 
 
 def input(key):
-    global blockType, buildMode, generating
+    global blockType, buildMode, generating, ii
     global canGenerate
     global build_distance
 
@@ -156,6 +157,29 @@ def input(key):
     if key == '2': blockType = BTYPE.GRASS
     if key == '3': blockType = BTYPE.STONE
     if key == '4': blockType = BTYPE.RUBY
+
+    # Binding key for linkers
+    if key == '1':
+        blockType = BTYPE.SOIL
+        ii = 1
+    if key == '2':
+        blockType = BTYPE.GRASS
+        ii = 2
+    if key == '3':
+        blockType = BTYPE.STONE
+        ii = 3
+    if key == '4':
+        blockType = BTYPE.RUBY
+        ii = 4
+    input_handler.rebind('page down', 'd')
+    input_handler.rebind('delete', 'a')
+    input_handler.rebind('home', 'w')
+    input_handler.rebind('right control', 'space')
+    input_handler.rebind('end', 's')
+    input_handler.rebind('enter', 'f')
+    input_handler.rebind('backspace', 'q')
+    input_handler.rebind('page up', 'g')
+    input_handler.rebind('insert', str(ii + 1), )
 
 
 def update():

@@ -10,7 +10,7 @@ from ursina import Entity, color, Vec3, random
 
 def plant_tree(_x, _y, _z):
     tree = Entity(model=None, position=Vec3(_x, _y, _z))
-    crown = Entity(model='cube', scale=6, y=7, color=color.green)
+    crown = Entity(model='cube', scale=6, y=7, color=color.green,  collider='box')
     trunk = Entity(model='cube', scale_x=0.6, scale_z=0.6, scale_y=9, color=color.brown, collider='box')
     crown.parent = tree
     trunk.parent = tree

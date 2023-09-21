@@ -128,6 +128,8 @@ def input(key):
         # build_distance -= 1
     if key == 'f':
         buildMode *= -1
+
+    # Binding key for linkers
     if key == '1':
         blockType = BTYPE.SOIL
         ii = 1
@@ -141,7 +143,6 @@ def input(key):
         blockType = BTYPE.RUBY
         ii = 4
 
-    # Binding key for linkers
     input_handler.rebind('page down', 'd')
     input_handler.rebind('delete', 'a')
     input_handler.rebind('home', 'w')
@@ -203,7 +204,7 @@ for i in range(numSubCubes):
     bud.disable()
     subCubes.append(bud)
 
-# Instantiate our empty subset
+# # Instantiate our empty subset
 for i in range(numSubsets):
     bud = Entity(model='cube', texture=grassTex)
     bud.disable()
@@ -260,11 +261,12 @@ def genTerrain():
 
             # And ready to buyild a megaset?
             if currentSubset == numSubsets:
-                megasets.append(Entity(model='cube', texture=grassTex))
+                # megasets.append(Entity(model='cube', texture=grassTex, collider='box'))
+                megasets.append(build())
                 # Parent all subsets to our new megaset
                 for s in subsets:
                     s.parent = megasets[-1]
-                megasets[-1].combine(auto_destroy=False)
+                # megasets[-1].combine(auto_destroy=False)
                 for s in subsets:
                     s.parent = scene
                 currentSubset = 0
@@ -298,7 +300,6 @@ def generateShell():
     step_height = 0
     # What y is the terrain at this position?
     target_y = genPerlin(subject.x, subject.z) + 2
-    # subject.y = lerp(subject.y, target_y, 9.807 * delta_time)
     # How far are we from the target y?
     target_dist = target_y - subject.y
     if 0 < target_dist < 5:
@@ -308,15 +309,9 @@ def generateShell():
     elif target_dist < -step_height:
         grav_speed += grav_ace * delta_time
         subject.y -= grav_speed
-    # print('subject_y: ' + str(subject.y) + ';       target_y: ' + str(target_y))
-
-    # global shellWidth
-    # for i in range(len(shellies)):
-    #     x = shellies[i].x = floor((i / shellWidth) + subject.x - 0.5 * shellWidth)
-    #     z = shellies[i].z = floor((i % shellWidth) + subject.z - 0.5 * shellWidth)
-    #     shellies[i].y = genPerlin(x, z)
-
-
+#
+#
+#
 # Subject First Person
 subject = FirstPersonController()
 subject.cursor.visible = False
@@ -349,6 +344,6 @@ baby = Entity(model=axoModel, scale=10,
               double_sided=True,
               colaider='mesh')
 
-generateShell()
+# generateShell()
 
 app.run()
