@@ -149,7 +149,7 @@ def input(key):
     input_handler.rebind('end', 's')
     input_handler.rebind('enter', 'f')
     input_handler.rebind('backspace', 'q')
-    input_handler.rebind('\\', 'g')
+    input_handler.rebind('page up', 'g')
     input_handler.rebind('insert', str(ii + 1), )
 
 
@@ -210,7 +210,7 @@ for i in range(numSubsets):
     subsets.append(bud)
 
 
-def genPerlin(_x, _z, plant_tree=False):
+def genPerlin(_x, _z, plant_tree=True):
     y = 0
     freq = 64
     amp = 42
